@@ -1,5 +1,6 @@
-#!/usr/bin/env python3
-
+#!/opt/prometheus/python/bin/python3
+# source https://github.com/enix/hpmsa_exporter , modified by Alexander Golikov, passwords were hidden in ENV
+import os
 import hashlib
 import time
 import argparse
@@ -8,9 +9,7 @@ import requests
 import prometheus_client
 import lxml.etree
 
-
 import xml.etree.ElementTree as ET
-
 
 PREFIX = 'msa_'
 HOSTPORTSTATS_PROPERTIES_AS_LABEL_MAPPING = {'durable-id': 'port'}
@@ -22,7 +21,6 @@ POOL_PROPERTIES_AS_LABEL_MAPPING = {'name': 'pool', 'serial-number': 'serial'}
 TIER_PROPERTIES_AS_LABEL_MAPPING = {'tier': 'tier', 'pool': 'pool', 'serial-number': 'serial'}
 CONTROLLER_PROPERTIES_AS_LABEL_MAPPING = {'durable-id': 'controller'}
 PSU_PROPERTIES_AS_LABEL_MAPPING = {'durable-id': 'psu', 'serial-number': 'serial'}
-
 
 METRICS = {
     'hostport_data_read': {
@@ -803,6 +801,8 @@ class MetricStore(object):
 
 def scrap_msa(metrics_store, host, login, password):
     session = requests.Session()
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     session.verify = False
 
     creds = hashlib.md5(b'%s_%s' % (login.encode('utf8'), password.encode('utf8'))).hexdigest()
@@ -836,18 +836,32 @@ def scrap_msa(metrics_store, host, login, password):
                           if elem.get('name') in source.get('properties_as_label', {})}
                 labels.update(source.get('labels', {}))
                 value = obj.find(source['property_selector']).text
-                metrics_store.get_or_create(metric.get('type', 'gauge'), name, metric['description'], labels).set(value)
+                try:
+                    metrics_store.get_or_create(metric.get('type', 'gauge'), name, metric['description'], labels).set(
+                        value)
+                except TypeError:
+                    pass
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('hostname')
-    parser.add_argument('login')
-    parser.add_argument('password')
-    parser.add_argument('-p', '--port', type=int, default=8000)
-    parser.add_argument('-i', '--interval', type=int, default=60)
+    env_hostname = os.getenv('msa_hostname', '')
+    env_login = os.getenv('msa_login', '')
+    env_password = os.getenv('msa_password', '')
+    env_port = int(os.getenv('msa_exporter_port', '8000'))
+
+    parser = argparse.ArgumentParser(description='HPE MSA exporter',
+                                     usage='%(prog)s [options].\n' +
+                                           '   Optional ENV: \n\tmsa_exporter_port, \n\tmsa_hostname, \n\tmsa_login, \n\tmsa_password.')
+    parser.add_argument('--hostname', required=False, default=env_hostname)
+    parser.add_argument('--login', default=env_login, help='msa login')
+    parser.add_argument('--password', default=env_password, help='msa password')
+    parser.add_argument('--port', type=int, default=env_port, help='exporter port')
+    parser.add_argument('--interval', type=int, default=60, help='refresh interval')
 
     args = parser.parse_args()
+    if args.hostname == "":
+        parser.print_help()
+        raise SystemExit(1)
 
     prometheus_client.start_http_server(args.port)
     metrics_store = MetricStore()

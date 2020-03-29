@@ -4,7 +4,25 @@ A prometheus exporter for the HP MSA Storage SAN.
 
 ## Usage
 
-    ./msa_exporter.py --port 8000 --interval 60 msa_san_hostname msa_san_username msa_san_password
+    ./msa_exporter.py [options]
+    
+       Optional ENV: 
+        msa_exporter_port, 
+        msa_hostname, 
+        msa_login, 
+        msa_password.
+        
+       Optional arguments:
+       --hostname HOSTNAME
+       --login LOGIN        msa login
+       --password PASSWORD  msa password
+       --port PORT          exporter port  (default 8000)
+       --interval INTERVAL  refresh interval sec (default 60sec)
+       
+## Usage Example
+     export msa_login=monitoruser
+     export msa_password=userpassword
+     /opt/prometheus/python/bin/python3 /opt/prometheus/plugins/msa/msa_exporter.py --hostname 192.168.11.11 --port 8004
 
 ## Metrics
 
@@ -87,3 +105,4 @@ This exporter exposes the following metrics:
 This exporter has been tested on the following hardware:
 
  - MSA 2050 series using 3.5" and 2.5" backplanes with or without external JBODs
+ - MSA 1040 series using 3.5" with external JBOD
